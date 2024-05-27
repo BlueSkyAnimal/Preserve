@@ -7,27 +7,40 @@
 
 import SwiftUI
 
-@available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, xrOS 1.0, *)
-extension Color: Codable {
+@available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
+extension Color: RawRepresentable, Codable {
 #if canImport(UIKit)
-    typealias SystemColor = UIColor
+    public typealias SystemColor = UIColor
 #elseif canImport(AppKit)
-    typealias SystemColor = NSColor
+    public typealias SystemColor = NSColor
 #endif
     
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        let systemColor = SystemColor(self)
-        let colorData = try NSKeyedArchiver.archivedData(withRootObject: systemColor, requiringSecureCoding: false)
-        try container.encode(colorData)
+    public init(systemColor: SystemColor) {
+        #if os(iOS)
+        self = .init(uiColor: systemColor)
+        #elseif os(macOS)
+        self = .init(nsColor: systemColor)
+        #endif
     }
     
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let colorData = try container.decode(Data.self)
-        guard let systemColor = try NSKeyedUnarchiver.unarchivedObject(ofClass: SystemColor.self, from: colorData) else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Failed to decode Color.")
+    public var rawValue: String {
+        do {
+            let data = try NSKeyedArchiver.archivedData(withRootObject: SystemColor(self), requiringSecureCoding: false)
+            return String(data: data, encoding: .utf8)!
+        } catch {
+            print(error.localizedDescription)
+            return "{}"
         }
-        self.init(systemColor)
+    }
+    
+    public init?(rawValue: String) {
+        let data = Data(rawValue.utf8)
+        do {
+            let color = try NSKeyedUnarchiver.unarchivedObject(ofClass: SystemColor.self, from: data)!
+            self = Color(color)
+        } catch {
+            print(error.localizedDescription)
+            return nil
+        }
     }
 }
